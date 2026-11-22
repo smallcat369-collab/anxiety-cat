@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>焦慮適性測驗（課程教學示範）</title>
+<style>
+:root{
+  --bg:#f7f8fc; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
+  --brand:#1e3a8a; --brand-soft:#eef2ff; --line:#c7d2fe; --accent:#6d28d9;
+  --warn-bg:#fff7ed; --warn-line:#fdba74; --warn-ink:#9a3412;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f172a; --card:#1e293b; --ink:#e5e7eb; --muted:#94a3b8;
+    --brand:#93c5fd; --brand-soft:#1e3a5f; --line:#334155; --accent:#c4b5fd;
+    --warn-bg:#3b2410; --warn-line:#9a3412; --warn-ink:#fdba74;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:17px;line-height:1.7}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:23px;color:var(--brand);margin:4px 0 10px;line-height:1.4}
+.notice{font-size:14.5px;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-ink);
+  border-radius:12px;padding:10px 14px;margin:0 0 18px}
+.notice b{display:block;margin-bottom:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 18px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.meta{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:6px}
+.bar{height:8px;border-radius:4px;background:var(--brand-soft);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--brand);transition:width .25s}
+.stem{margin-top:16px;font-size:15px;color:var(--muted)}
+.q{font-size:22px;font-weight:700;margin:2px 0 16px;line-height:1.5}
+.opts{display:grid;gap:8px}
+.opts button,.btn{font:inherit;font-size:18px;min-height:48px;border-radius:12px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.opts button{width:100%;text-align:left;padding:10px 16px;background:var(--card);color:var(--ink);
+  border:1.5px solid var(--line)}
+.opts button:hover{border-color:var(--brand);background:var(--brand-soft)}
+.opts button:active{transform:scale(.99)}
+.opts button:disabled{opacity:.6;cursor:default}
+.btn{padding:10px 22px;border:0;background:var(--brand);color:var(--card);font-weight:700}
+.result-num{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.result-num div{background:var(--brand-soft);border-radius:12px;padding:10px 6px;text-align:center}
+.result-num small{display:block;font-size:13px;color:var(--muted)}
+.result-num strong{font-size:24px;color:var(--brand)}
+.hint{font-size:15px;color:var(--muted)}
+details{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+summary{cursor:pointer;color:var(--brand);font-weight:700}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin-top:10px;font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:center;white-space:nowrap}
+th{background:var(--brand-soft)}
+footer{margin-top:20px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>焦慮適性測驗</h1>
+<div class="notice" role="note">
+  <b>這是課程教學示範，不是心理診斷工具。</b>
+  作答只在你的瀏覽器中計算，不會被傳送或儲存。如果你最近感到困擾，請與身邊信任的人或專業人員聊聊。
+</div>
+
+<div id="app" aria-live="polite"></div>
+
+<details id="logBox">
+  <summary>驗收用：每一步的計算過程</summary>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>步驟</th><th>題號</th><th>作答（0/1）</th><th>θ</th><th>SE</th></tr></thead>
+      <tbody id="log"><tr><td colspan="5">尚未作答</td></tr></tbody>
+    </table>
+  </div>
+</details>
+
+<footer>題庫：PROMIS 焦慮量表 29 題（中文為教師翻譯），以二參數邏輯模型（2PL）估計，樣本 766 人。</footer>
+</main>
+
+<script>
+"use strict";
+// ---------- 題庫：item_bank.csv（題號、題目、鑑別度 a、位置 b） ----------
+const BANK = [
+  ["R1","我感到害怕",3.55,0.472],
+  ["R2","我感到驚恐",3.239,0.555],
+  ["R3","我一緊張就覺得害怕",3.661,0.643],
+  ["R4","我感到焦慮",3.499,-0.057],
+  ["R5","我覺得我的焦慮需要別人幫忙",3.298,0.702],
+  ["R6","我擔心自己的心理健康",2.544,0.481],
+  ["R7","我感到心煩",3.06,-0.308],
+  ["R8","我心跳很快或心臟怦怦跳",1.68,0.577],
+  ["R9","日常作息被打亂時，我會焦慮",1.731,0.284],
+  ["R10","我突然感到恐慌",3.809,0.646],
+  ["R11","我很容易受到驚嚇",1.89,0.235],
+  ["R12","我難以集中注意力",2.42,-0.194],
+  ["R13","我避開公共場所或活動",1.979,0.415],
+  ["R14","我坐立不安",2.429,0.051],
+  ["R15","我覺得會有可怕的事情發生",2.856,0.525],
+  ["R16","我感到擔心",3.485,-0.303],
+  ["R17","我感到極度恐懼",3.674,1.066],
+  ["R18","我擔心別人對我的反應",1.83,-0.13],
+  ["R19","除了我的焦慮，我很難專注在其他事情上",3.6,0.646],
+  ["R20","我的擔憂讓我招架不住",3.349,0.476],
+  ["R21","我的肌肉會抽動或顫抖",1.279,0.683],
+  ["R22","我感到緊張",4.006,-0.04],
+  ["R23","我覺得猶豫不決",2.219,-0.123],
+  ["R24","很多情況都讓我擔心",2.835,-0.032],
+  ["R25","我難以入睡",1.662,-0.71],
+  ["R26","我難以放鬆",2.765,-0.27],
+  ["R27","我感到不安",3.456,-0.047],
+  ["R28","我感到緊繃",3.162,-0.298],
+  ["R29","我很難平靜下來",3.649,0.354]
+];
+
+// ---------- 設定 ----------
+const SE_STOP = 0.4;        // 停止規則：SE < 0.4
+const MAX_ITEMS = 12;       // 或已作答 12 題
+const OPTIONS = ["從不","很少","有時","經常","總是"];   // 「從不」記 0，「很少」以上記 1
+
+// θ 格點：−4 到 4，間隔 0.05，共 161 點（用整數乘法避免累加誤差）
+const GRID = Array.from({length:161}, (_, i) => -4 + i * 0.05);
+// 事前分配 N(0,1)（常數項在標準化時會消掉）
+const PRIOR = GRID.map(g => Math.exp(-g * g / 2));
+
+// ---------- 2PL ----------
+const prob = (t, a, b) => 1 / (1 + Math.exp(-a * (t - b)));
+const info = (t, a, b) => { const p = prob(t, a, b); return a * a * p * (1 - p); };
+
+// ---------- 狀態 ----------
+let post, used, theta, se;
+const app = document.getElementById("app");
+const logBody = document.getElementById("log");
+
+function start() {
+  post = PRIOR.slice();
+  used = [];
+  theta = 0;           // 起始估計值 θ = 0
+  se = 1;
+  logBody.innerHTML = "";
+  showItem(selectNext());
+}
+
+// 在尚未作答的題目中，挑目前 θ 訊息量最大的一題（同分時取題號較前者）
+function selectNext() {
+  let best = -Infinity, bi = -1;
+  for (let i = 0; i < BANK.length; i++) {
+    if (used.includes(i)) continue;
+    const v = info(theta, BANK[i][2], BANK[i][3]);
+    if (v > best) { best = v; bi = i; }
+  }
+  return bi;
+}
+
+// EAP：後驗 ∝ 事前 × 各題作答機率；θ = 後驗平均，SE = 後驗標準差
+function update(i, x) {
+  const a = BANK[i][2], b = BANK[i][3];
+  post = post.map((w, k) => { const p = prob(GRID[k], a, b); return w * (x === 1 ? p : 1 - p); });
+  const z = post.reduce((s, w) => s + w, 0);
+  post = post.map(w => w / z);                       // 標準化，避免數值下溢
+  theta = post.reduce((s, w, k) => s + w * GRID[k], 0);
+  se = Math.sqrt(post.reduce((s, w, k) => s + w * (GRID[k] - theta) ** 2, 0));
+  used.push(i);
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${used.length}</td><td>${BANK[i][0]}</td><td>${x}</td><td>${theta.toFixed(3)}</td><td>${se.toFixed(3)}</td>`;
+  logBody.appendChild(tr);
+}
+
+function answer(i, k, btns) {
+  btns.forEach(b => b.disabled = true);              // 避免連點
+  update(i, k >= 1 ? 1 : 0);
+  if (se < SE_STOP || used.length >= MAX_ITEMS || used.length >= BANK.length) finish();
+  else showItem(selectNext());
+}
+
+function showItem(i) {
+  const n = used.length;
+  app.innerHTML = `
+    <section class="card">
+      <div class="meta"><span>第 ${n + 1} 題</span><span>最多 ${MAX_ITEMS} 題</span></div>
+      <div class="bar"><i style="width:${n / MAX_ITEMS * 100}%"></i></div>
+      <div class="stem">在過去七天中……</div>
+      <div class="q">${BANK[i][1]}</div>
+      <div class="opts">${OPTIONS.map((o, k) => `<button type="button" data-k="${k}">${o}</button>`).join("")}</div>
+    </section>`;
+  const btns = [...app.querySelectorAll(".opts button")];
+  btns.forEach(b => b.addEventListener("click", () => answer(i, +b.dataset.k, btns)));
+}
+
+function finish() {
+  const level = theta < -0.5 ? "低於" : theta > 0.5 ? "高於" : "接近";
+  const notMet = se >= SE_STOP
+    ? `<p>結束時 SE 仍然在 ${SE_STOP} 以上。這不是你作答有問題，而是題庫中沒有更適合你這個位置的題目，所以多問幾題，估計的不確定程度也降不下來。</p>`
+    : "";
+  app.innerHTML = `
+    <section class="card">
+      <div class="q">測驗結束</div>
+      <div class="result-num">
+        <div><small>作答題數</small><strong>${used.length}</strong></div>
+        <div><small>估計值 θ</small><strong>${theta.toFixed(2)}</strong></div>
+        <div><small>標準誤 SE</small><strong>${se.toFixed(2)}</strong></div>
+      </div>
+      <p>θ 是以建立題庫的 766 位一般民眾為基準（平均 0、標準差 1）。你的估計值${level}這群人的平均。</p>
+      ${notMet}
+      <p class="hint">提醒：這個分數只用來示範適性測驗如何運作，不代表任何診斷。</p>
+      <button type="button" class="btn" id="again">重新作答</button>
+    </section>`;
+  document.getElementById("again").addEventListener("click", start);
+}
+
+// ---------- 開始畫面 ----------
+app.innerHTML = `
+  <section class="card">
+    <p>接下來的題目會依照你前面的回答挑選，所以每個人作答的題目與題數都不同，最多 ${MAX_ITEMS} 題。</p>
+    <p class="hint">每題請依「過去七天」的感受選擇最接近的選項。</p>
+    <button type="button" class="btn" id="go">開始作答</button>
+  </section>`;
+document.getElementById("go").addEventListener("click", start);
+</script>
+</body>
+</html>
